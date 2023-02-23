@@ -1,0 +1,86 @@
+\chapter{Конструкторский раздел}
+
+
+\section{Аппроксимация трёхмерных объектов}
+
+В программе будет генерироваться икосфера --- это многогранная сфера, состоящая из треугольников.
+
+Алгоритм триангуляции сферы следующий.
+
+\begin{enumerate}
+	\item Задать число сечений (параллелей) и количество разбиений для каждого сечения (меридиан).
+        \item На каждом сечении подсчитать углы поворота радиуса вектора для очередной точки грани по формулам следующей системы уравнений~(\ref{eq:angles}):
+        \begin{equation}\label{eq:angles}
+            \begin{cases}
+	        \alpha = \frac{\pi}{k_{1}}, \\
+                \beta = \frac{2 \cdot \pi}{k_{2}},
+            \end{cases}
+        \end{equation}
+        \noindent где $k_{1}$, $k_{2}$ --- число сечений и разбиений для каждого сечения.
+	\item На каждом сечении найти нужные точки, разделив окружность на равные части.
+	\item Соединив точки, получим сферу, разбитую на треугольники.
+\end{enumerate}
+
+Координаты вершин аппроксимирующих треугольников можно рассчитать по формулам следующей системы уравнений~(\ref{eq:triangle}):
+    \begin{equation}\label{eq:triangle}
+        \begin{cases}
+	    x = r * \sin(\alpha \cdot i) \cdot \cos(\beta \cdot j), i = \overline{0, k_{1}}, j = \overline{0, k_{2} - 1}\\
+            y = r * \cos(\alpha \cdot i),\\
+            z = r * \sin(\alpha \cdot i) \cdot \sin(\beta \cdot j),
+        \end{cases}
+    \end{equation}
+
+\noindent где $r$ --- радиус сферы.
+
+
+%\section{Структура преобразований трёхмерных координат}
+%Экран обладает только двумя координатами, поэтому нужно выбрать способ для переноса трёхмерных объектов на двухмерное пространство экрана. Алгоритм приведения координат к нужному виду представлен на рисунке 3.1 в виде схемы последовательных преобразований.%
+
+\section{Объединенный алгоритм удаления невидимых граней с использованием z-буфера и закраски по Гуро}
+
+На рисунке \ref{img:zbuf} приведена схема алгоритма z-буфера. Совместно с алгоритмом z-буфера применяется закраска по Гуро.
+
+\img{180mm}{zbuf}{Схема алгоритма z-буфера с закраской по Гуро}
+
+
+\section{Алгоритм перемещения сферы}
+
+Для нахождения точек орбиты сферы используется метод численного интегрирования Верле~\cite{verle}. Это алгоритм позволяет определить следующее положение тела, зная текущее и предыдущее положения без использования скорости.
+
+Раскладывается вектор местоположения точки $\overrightarrow{r}(t)$ в моменты времени $(t + \bigtriangleup{t})$ и $(t - \bigtriangleup{t})$ по формуле Тейлора~(\ref{eq:teilor}):
+    \begin{equation}\label{eq:teilor}
+        \begin{cases}
+	    \overrightarrow{r}(t + \bigtriangleup{t}) = \overrightarrow{r}(t) + \overrightarrow{v}(t) \cdot \bigtriangleup{t} + \frac{\overrightarrow{a}(t)}{2} \cdot \bigtriangleup{t}^2 + \frac{\overrightarrow{b}(t)}{6} \cdot \bigtriangleup{t}^3+ O(\bigtriangleup{t}^4),\\
+            \overrightarrow{r}(t - \bigtriangleup{t}) = \overrightarrow{r}(t) - \overrightarrow{v}(t) \cdot \bigtriangleup{t} + \frac{\overrightarrow{a}(t)}{2} \cdot \bigtriangleup{t}^2 - \frac{\overrightarrow{b}(t)}{6} \cdot \bigtriangleup{t}^3+ O(\bigtriangleup{t}^4),
+        \end{cases}
+    \end{equation}
+
+\noindent где $\overrightarrow{v}(t)$ --- вектор скорости, $\overrightarrow{a}(t)$ --- вектор ускорения, $\overrightarrow{b}(t)$ --- производная ускорения по времени.
+
+Затем складываются полученные формулы и выражается $\overrightarrow{r}(t + \bigtriangleup{t})$ по формуле~(\ref{eq:r}):
+    \begin{equation}\label{eq:r}
+	    \overrightarrow{r}(t + \bigtriangleup{t}) = 2 \cdot \overrightarrow{r}(t) - \overrightarrow{r}(t - \bigtriangleup{t}) + \overrightarrow{a}(t) \cdot \bigtriangleup{t}^2 + O(\bigtriangleup{t}^4).
+    \end{equation}
+
+Небесные сферы двигаются по действием силы гравитационного взаимодействия, которая расчитывается по формуле~(\ref{eq:f}):
+    \begin{equation}\label{eq:f}
+	    \overrightarrow{F} =  G \cdot \frac{m_{1} \cdot m_{2}}{r^3} \cdot \overrightarrow{r}(t),
+    \end{equation}
+
+\noindent где $\overrightarrow{r}(t)$ --- вектор, соединяющий звезды, $m_{1}$, $m_{2}$ --- массы звезд, $G$ --- гравитационная постоянная.
+
+Тогда из второго закона Ньютона выражается ускорение по формуле~(\ref{eq:a}):
+    \begin{equation}\label{eq:a}
+	    \overrightarrow{a}(t) = \frac{\overrightarrow{F}(t)}{m}.
+    \end{equation}
+
+Возникает проблема с поиском положения в самый первый момент и последующий за ним. Предыдущему положению можно задать начальное условие (положение старта), а текущее вычисляется по формуле равноускоренного движения~(\ref{eq:dvig}):
+    \begin{equation}\label{eq:dvig}
+	    \overrightarrow{r}(t + \bigtriangleup{t}) = \overrightarrow{r}(t) + \overrightarrow{v}(t) \cdot \bigtriangleup{t} + \frac{\overrightarrow{a}(t)}{2} \cdot \bigtriangleup{t}^2.
+    \end{equation}
+
+
+\section{Вывод}
+
+В данном разделе были описаны алгоритм передвижения сфер, способ моделирования многогранной сферы, приведена схема алгоритма, объединяющего z-буфер и закраску по Гуро.
+

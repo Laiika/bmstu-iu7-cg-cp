@@ -1,0 +1,226 @@
+\chapter{Технологический раздел}
+
+\section{Выбор языка и среды программирования}
+
+В качестве языка программирования был выбран С++, по следующим причинам:
+
+\begin{itemize}[label=---]
+	\item поддержка ООП;
+        \item благодаря своей вычислительной мощности язык обеспечивает высокую скорость исполнения кода;
+	\item в стандартной библиотеке имеется множество готовых контейнеров и алгоритмов.
+\end{itemize}
+
+В качестве среды программирования был выбран <<QtCreator>>, так как:
+
+\begin{itemize}[label=---]
+	\item в рамках фреймворка Qt представлена многофункциональная и производительная графическая библиотека;
+	\item данная среда бесплатна для студентов.
+\end{itemize}
+
+
+\section{Структура программы}
+
+Структура программы представлена на рисунке 3.1 в виде схемы последовательных преобразований.
+
+\img{15mm}{struct}{Структура программы}
+
+Разработанная программа состоит из следующих классов.
+  
+\begin{enumerate}
+	\item Классы объектов сцены:
+	\begin{itemize}
+		\item Camera --- класс камеры с возможностью перемещения по сцене;
+		\item Sphere --- класс трёхмерных объектов (сфер), содержащий характеристики сфер и их орбиты.
+	\end{itemize}
+        \item Класс для работы с моделями сфер:
+	\begin{itemize}
+		\item Mesh --- класс полигональной сетки, описывающий представление трёхмерного объекта в программе и методы работы с ним.
+	\end{itemize}
+	\item Вспомогательные классы сцены:
+	\begin{itemize}
+		\item Scene --- класс, содержащий набор объектов;
+            \item Painter --- класс отрисовки сцены.
+	\end{itemize}
+	\item Класс интерфейса пользователя:
+	\begin{itemize}
+		\item MainWindow --- класс главного окна сцены. 
+	\end{itemize}	
+\end{enumerate}
+
+На рисунке \ref{img:shema} приведена диаграмма классов.
+
+\img{80mm}{shema}{Диаграмма классов}
+
+
+\section{Реализации алгоритмов}
+
+В листинге \ref{lst:orbit} представлен алгоритм расчета точек орбиты сферы, в листинге \ref{lst:zbuff} --- алгоритм z-буфера, совмещенный с закраской по Гуро.
+
+
+\begin{center}
+\captionsetup{justification=raggedright,singlelinecheck=off}
+\begin{lstlisting}[label=lst:orbit,caption=Алгоритм расчета точек орбиты сферы]
+void Sphere::calc_trajectory(Point3D& s2, Point3D& vs1, Point3D& vs2, double m2)
+{
+    Point3D fs, es, s1 = center;
+    double m1 = m;
+    double rasts = sqrt((s1.x - s2.x) * (s1.x - s2.x) + (s1.z - s2.z) * (s1.z - s2.z));
+    double dt = 0.025;
+    points.clear();
+
+    double xp2 = s2.x, xp1 = s1.x;
+    double zp2 = s2.z, zp1 = s1.z;
+    double xc1 = xp1 + vs1.x * dt - (dt * dt * 0.5 * G * m2 * (s1.x - s2.x)) / (rasts * rasts * rasts);
+    double xc2 = xp2 + vs2.x * dt + (dt * dt * 0.5 * G * m1 * (s1.x - s2.x)) / (rasts * rasts * rasts);
+    double zc1 = zp1 + vs1.z * dt - (dt * dt * 0.5 * G * m2 * (s1.z - s2.z)) / (rasts * rasts * rasts);
+    double zc2 = zp2 + vs2.z * dt + (dt * dt * 0.5 * G * m1 * (s1.z - s2.z)) / (rasts * rasts * rasts);
+
+    s2.x = xc2;
+    s2.z = zc2;
+    s1.x = xc1;
+    s1.z = zc1;
+
+    for (int i = 0; i < 207; i++)
+    {
+        points.push_back(s1);
+
+        rasts =  sqrt((s1.x - s2.x) * (s1.x - s2.x) + (s1.z - s2.z) * (s1.z- s2.z));
+        es.x = (s1.x - s2.x) / rasts;
+        es.z = (s1.z - s2.z) / rasts;
+        fs.x = (G * m1 * m2 * es.x) / (rasts * rasts);
+        fs.z = (G * m1 * m2 * es.z) / (rasts * rasts);
+
+        s1.x = 2 * xc1 - xp1 - (fs.x) * dt * dt / m1;
+        s1.z = 2 * zc1 - zp1 - (fs.z) * dt * dt / m1;
+        xp1 = xc1;
+        xc1 = s1.x;
+        zp1 = zc1;
+        zc1 = s1.z;
+
+        s2.x = 2 * xc2 - xp2 + (fs.x) * dt * dt / m2;
+        s2.z = 2 * zc2 - zp2 + (fs.z) * dt * dt / m2;
+        xp2 = xc2;
+        xc2 = s2.x;
+        zp2 = zc2;
+        zc2 = s2.z;
+    }
+    cur = 0;
+}
+\end{lstlisting}
+\end{center}
+
+\begin{center}
+\captionsetup{justification=raggedright,singlelinecheck=off}
+\begin{lstlisting}[label=lst:zbuff,caption=Алгоритм z-буфера с закраской по Гуро]
+void Painter::textureSpTriangle(Mesh mesh, int a, int b, int c, std::vector<QPoint> points, std::vector<QPoint> texturePoints, QImage *img, QImage *img2, double light, Point3D p)
+{
+    double u,v,w;
+    QColor kolor;
+    double Xa = points[0].x(),Xb = points[1].x(),Xc = points[2].x();
+    double Ya = points[0].y(),Yb = points[1].y(),Yc = points[2].y();
+
+    double div = (Xb - Xa)  * (Yc - Ya) - (Yb - Ya) * (Xc - Xa);
+    if(div == 0.0)
+        return;
+
+    Point3D Na = Point3D(mesh.Tnodes[a].x - p.x, mesh.Tnodes[a].y - p.y, mesh.Tnodes[a].z - p.z);
+    Point3D Nb = Point3D(mesh.Tnodes[b].x - p.x, mesh.Tnodes[b].y - p.y, mesh.Tnodes[b].z - p.z);
+    Point3D Nc = Point3D(mesh.Tnodes[c].x - p.x, mesh.Tnodes[c].y - p.y, mesh.Tnodes[c].z - p.z);
+    Point3D pa = mesh.Tnodes[a],pb = mesh.Tnodes[b],pc = mesh.Tnodes[c];
+    double Ia = countStarLightIntense(Na, pa);
+    double Ib = countStarLightIntense(Nb, pb);
+    double Ic = countStarLightIntense(Nc, pc);
+
+    Point3D wall = mesh.countNormalVector(mesh.Tnodes[a],mesh.Tnodes[b], mesh.Tnodes[c]);
+
+    QPoint A = mesh.points[a], B = mesh.points[b],C = mesh.points[c];
+    if (A.y() > B.y())
+    {
+        std::swap(A, B);
+        std::swap(Ia, Ib);
+    }
+    if (A.y() > C.y())
+    {
+        std::swap(A, C);
+        std::swap(Ia, Ic);
+    }
+    if (B.y() > C.y())
+    {
+        std::swap(B, C);
+        std::swap(Ib, Ic);
+    }
+
+    int xmin = (int)minim(Xa, Xb, Xc), ymin = (int)minim(Ya, Yb, Yc);
+    int xmax = (int)maxim(Xa, Xb, Xc), ymax = (int)maxim(Ya, Yb, Yc);
+    for(int y = ymin; y < ymax; y++)
+    {
+        bool half2 = (y - ymin) > B.y() - A.y() || B.y() == A.y();
+        int h = half2 ? C.y() - B.y() : B.y() - A.y();
+        float alpha = (float)(y - ymin) / (ymax - ymin);
+        float betta = (float)(y - ymin - (half2 ? B.y() - A.y() : 0)) / h;
+
+        QPoint minp = A + (C - A) * alpha;
+        QPoint maxp = half2 ? B + (C - B) * betta : A + (B - A) * betta;
+        double Id, If;
+        Id = Ia + (Ic - Ia) * alpha;
+        If = half2 ? Ib + (Ic - Ib) * betta : Ia + (Ib - Ia) * betta;
+
+        if (minp.x() > maxp.x())
+        {
+            std::swap(minp, maxp);
+            std::swap(Id, If);
+        }
+        minp.setX(std::max(xmin, minp.x()));
+        maxp.setX(std::min(xmax, maxp.x()));
+        int d = maxp.x() - minp.x(), f = minp.x(), l = maxp.x();
+        for(int x = f; x < l; x++)
+        {
+            double Z = (-wall.x * (x - mesh.Tnodes[a].x) + -wall.y * (y - mesh.Tnodes[a].y))/wall.z + mesh.Tnodes[a].z;
+            if (zBuffer[x][y] < Z)
+            {
+                v = ((x - Xa) * (Yc - Ya) - (y - Ya) * (Xc - Xa))/div;
+                w = ((Xb - Xa) * (y - Ya) - (Yb - Ya) * (x - Xa))/div;
+                u = 1.0 - v - w;
+                if(u < 0 || u > 1 || v < 0 || v > 1 || w < 0 || w > 1) continue;
+
+                double xT = u * texturePoints[0].x() + v * texturePoints[1].x() + w * texturePoints[2].x();
+                double yT = u * texturePoints[0].y() + v * texturePoints[1].y() + w * texturePoints[2].y();
+                if(yT >= img->height()) yT = img->height() -1;
+                if(yT < 0) yT = 0;
+                if(xT >= img->width()) xT = img->width() -1;
+                if(xT < 0) xT = 0;
+
+                QRgb rgb = img->pixel(xT, yT);
+                kolor = QColor(qRed(rgb), qGreen(rgb), qBlue(rgb), qAlpha(rgb));
+
+                float phi = l == f ? 1. : (float)(x - f) / (float)(l - f);
+                double I = Id + (If - Id) * phi;
+                light = I;
+                setColor(x, y, kolor, light, img2);
+                zBuffer[x][y] = Z;
+            }
+        }
+    }
+}
+\end{lstlisting}
+\end{center}
+
+
+\section{Описание интерфейса}
+На рисунке \ref{img:screen} представлен интерфейс программы.
+
+\img{130mm}{screen}{Интерфейс программы}
+
+Функции представленных кнопок следующие:
+
+\begin{itemize}[label=---]
+	\item кнопки <<Запустить/Остановить>> позволяют запустить/остановить моделирование движения сфер;
+	\item кнопки <<Вправо/Влево>> позволяют перемещать камеру по оси ОX, то есть вправо/влево;
+        \item кнопки <<Вверх/Вниз>> позволяют перемещать камеру по оси ОY, то есть вверх/вниз.
+\end{itemize}
+
+Так же для перемещения камеры вправо/влево можно использовать кнопки <<E>> И <<Q>> соответственно, для перемещения камеры вверх/вниз --- кнопки <<A>> и <<D>>.
+
+
+\section{Вывод}
+В этом разделе был выбран язык программирования и среда разработки, рассмотрена диаграмма основных классов, приведены реализации алгоритмов и разобран интерфейс приложения.
